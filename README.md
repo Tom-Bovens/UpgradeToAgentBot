@@ -1,4 +1,4 @@
-# Chipchat Domain contact bot (W.I.P)
+# Chipchat Bug report bot (W.I.P)
 
 This bot will allow admins from an organisation to see a list of colleagues of the contact they are talking to.
 

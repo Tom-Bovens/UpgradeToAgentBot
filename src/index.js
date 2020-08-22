@@ -11,6 +11,7 @@ require('dotenv').config({
 const ChipChat = require('chipchat');
 const log = require('debug')('tourguide')
 const get = require('lodash/get');
+let conversationStatus = "begin"
 const incrementor = {
     // This function adds delay to the message to ensure the messages are posted in the right order
     autoDelayTime: 500,
@@ -43,9 +44,69 @@ if (!process.env.TOKEN) {
 bot.on('error', log);
 
 bot.on('message.create.*.command', async (message, conversation) => {
-    log(message.text)
-    if (message.text === "/join" || message.text === "/assign") {
+    log(message)
+    if (message.text === ">bug") {
         try {
+            await conversation.say({
+                contentType: 'text/html',
+                type: 'card',
+                participants: [message.user],
+                text: "Hey there! Support Chip here! You have called me to report a bug, isn't that right?",
+                isBackchannel: true,
+                actions: [
+                    {
+                        type: "reply",
+                        text: "Yes, that's right.",
+                        payload: "Continue"
+                    },
+                    {
+                        type: "reply",
+                        text: "No, I didn't.",
+                        payload: "Cancel"
+                    }
+                ]
+            })
+        } catch (e) {
+            errorCatch(e)
+        }
+    }
+});
+
+bot.on('message.create.*.postback', async (message, conversation) => {
+    try {
+        if (message.text === "Continue") {
+            await conversation.say({
+                contentType: 'text/html',
+                type: 'card',
+                participants: [message.user],
+                text: "Alright! So can you describe the issue you're having?",
+                isBackchannel: true,
+            })
+        } else if (message.text === "Cancel") {
+            await conversation.say({
+                contentType: 'text/html',
+                type: 'card',
+                participants: [message.user],
+                text: "Ok then! Have a good day!",
+                isBackchannel: true,
+            })
+        }
+    } catch (e) {
+        errorCatch(e)
+    }
+})
+
+bot.on('message.create.*.chat.*', async (message, conversation) => {
+
+})
+
+
+// Start Express.js webhook server to start listening
+bot.start();
+
+
+
+/*
             const user = conversation.participants.find(p => p.role === 'admin' || p.role === 'owner');
             if (user) {
                 const getUser = await bot.users.get(user.user)
@@ -102,11 +163,4 @@ bot.on('message.create.*.command', async (message, conversation) => {
                     }
                 }
             }
-        } catch (e) {
-            errorCatch(e)
-        }
-    }
-});
-
-// Start Express.js webhook server to start listening
-bot.start();
+            */
