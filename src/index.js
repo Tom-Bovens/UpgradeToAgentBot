@@ -1,9 +1,9 @@
 
 // Add meta to the card to check if the links are the same, and make the bot not post another card.
-// Make a more appropriate video.
+    // Make a more appropriate video.
 
 
-const path = require('path');
+    const path = require('path');
 const envfile = `${process.cwd()}${path.sep}.env`;
 require('dotenv').config({
     path: envfile
@@ -12,6 +12,9 @@ const ChipChat = require('chipchat');
 const log = require('debug')('tourguide')
 const get = require('lodash/get');
 let conversationStatus = "begin"
+let bugString = ""
+let replicationString = ""
+let imageURL = ""
 const incrementor = {
     // This function adds delay to the message to ensure the messages are posted in the right order
     autoDelayTime: 500,
@@ -49,7 +52,6 @@ bot.on('message.create.*.command', async (message, conversation) => {
         try {
             await conversation.say({
                 contentType: 'text/html',
-                type: 'card',
                 participants: [message.user],
                 text: "Hey there! Support Chip here! You have called me to report a bug, isn't that right?",
                 isBackchannel: true,
@@ -76,20 +78,44 @@ bot.on('message.create.*.postback', async (message, conversation) => {
     try {
         if (message.text === "Continue") {
             await conversation.say({
-                contentType: 'text/html',
-                type: 'card',
                 participants: [message.user],
                 text: "Alright! So can you describe the issue you're having?",
                 isBackchannel: true,
             })
+            conversationStatus = 'ListeningForBug'
         } else if (message.text === "Cancel") {
-            await conversation.say({
-                contentType: 'text/html',
-                type: 'card',
+            await conversation.say([{
                 participants: [message.user],
                 text: "Ok then! Have a good day!",
                 isBackchannel: true,
-            })
+            },
+                {
+                    type: 'command',
+                    text: "/leave"
+                }
+            ])
+        } else if (message.text === "ContinueReport") {
+            await conversation.say([{
+                participants: [message.user],
+                text: "Report submitted! Thanks for your help!",
+                isBackchannel: true,
+            },
+                {
+                    type: 'command',
+                    text: "/leave"
+                }
+            ])
+        } else if (message.text === "CancelReport") {
+            await conversation.say([{
+                participants: [message.user],
+                text: "Alright, call me again when you want to remake the report.",
+                isBackchannel: true,
+            },
+                {
+                    type: 'command',
+                    text: "/leave"
+                }
+            ])
         }
     } catch (e) {
         errorCatch(e)
@@ -97,7 +123,58 @@ bot.on('message.create.*.postback', async (message, conversation) => {
 })
 
 bot.on('message.create.*.chat.*', async (message, conversation) => {
-
+    log(message)
+    if (message.isBackchannel === true) {
+        if (conversationStatus === 'ListeningForBug') {
+            bugString = message.text
+            conversationStatus === 'ListeningForReplication'
+            await conversation.say({
+                contentType: 'text/html',
+                participants: [message.user],
+                text: "Can you give a quick description on how to reconstruct the issue? This is a pretty important step so describe it in detail.",
+                isBackchannel: true,
+            })
+        } else if (conversationStatus === 'ListeningForReplication') {
+            replicationString = message.text
+            conversationStatus === 'ListeningForImage'
+            await conversation.say({
+                contentType: 'text/html',
+                participants: [message.user],
+                text: "And do you happen to have an image of the bug? If you don't have one, just say anything else and I'll skip ahead.",
+                isBackchannel: true,
+            })
+        } else if (conversationStatus === 'ListeningForImage') {
+            imageURL = message.text
+            const match = string.match(message.text)
+            if (match.length === 0) {
+                imageURL = "N/A"
+            }
+            await conversation.say({
+                contentType: 'text/html',
+                participants: [message.user],
+                text: `Alright then. That was all.</br>${bugString}</br> ${replicationString}</br>${imageURL}`,
+                isBackchannel: true,
+            },
+                {
+                    contentType: 'text/html',
+                    participants: [message.user],
+                    text: "Is this the bug report you want to submit?",
+                    isBackchannel: true,
+                    actions: [
+                        {
+                            type: "reply",
+                            text: "Yes, send it off.",
+                            payload: "ContinueReport"
+                        },
+                        {
+                            type: "reply",
+                            text: "No, cancel the report.",
+                            payload: "CancelReport"
+                        }
+                    ]
+                })
+        }
+    }
 })
 
 
@@ -154,7 +231,6 @@ bot.start();
                         } else {
                             await conversation.say({
                                 contentType: 'text/html',
-                                type: 'card',
                                 participants: [user.user],
                                 text: string,
                                 isBackchannel: true
