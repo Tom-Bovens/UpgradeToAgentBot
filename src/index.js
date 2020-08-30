@@ -24,6 +24,7 @@ const errorCatch = (error) => {
     log(error);
 }
 
+
 // Create a new bot instance
 const bot = new ChipChat({
     host: process.env.HOST,
@@ -39,13 +40,11 @@ if (!process.env.TOKEN) {
 bot.on('error', log);
 
 bot.on('message.create.*.command', async (message, conversation) => {
-    if (message.text === ">bug") {
+    if (message.text === "/assign" && message.meta.users[0] === '5f42534edf6aa7001d0e7f1b') {
         try {
             await conversation.say({
                 contentType: 'text/html',
-                participants: [message.user],
                 text: "Hey there! Support Chip here! You have called me to report a bug, isn't that right?",
-                isBackchannel: true,
                 actions: [
                     {
                         type: "reply",
@@ -69,17 +68,13 @@ bot.on('message.create.*.postback', async (message, conversation) => {
     try {
         if (message.text === "Continue") {
             await conversation.say({
-                participants: [message.user],
                 text: "Alright! So can you describe the issue you're having?",
-                isBackchannel: true,
             })
             await conversation.set('bugreportstatus', 'Bug')
         } else if (message.text === "Cancel") {
             await conversation.set('bugreportstatus', 'Off')
             await conversation.say([{
-                participants: [message.user],
                 text: "Ok then! Have a good day!",
-                isBackchannel: true,
             },
                 {
                     type: 'command',
@@ -87,23 +82,43 @@ bot.on('message.create.*.postback', async (message, conversation) => {
                 }
             ])
         } else if (message.text === "ContinueReport") {
-            await conversation.set('bugreportstatus', 'Off')
-            await conversation.say([{
-                participants: [message.user],
-                text: "Report submitted! Thanks for your help!",
-                isBackchannel: true,
-            },
-                {
-                    type: 'command',
-                    text: "/leave"
-                }
-            ])
+            const botty = await bot.users.get('5f42534edf6aa7001d0e7f1b')
+            const channelname = botty.meta.bugreportchannel
+            const channel = await bot.channels.list({name: "Bug Reports", limit:1})
+            log(channel[0])
+            if (channel[0].id) {
+                await conversation.set('bugreportstatus', 'Off')
+                await conversation.say([{
+                    text: "Report submitted! Thanks for your help!",
+                },
+                    {
+                        type: 'command',
+                        text: "/leave"
+                    },
+                    {
+                        type: 'command',
+                        text: "/notify",
+                        meta: {
+                            channels: [
+                                channel[0].id
+                            ]
+                        }
+                    }
+                ])
+            } else {
+                await conversation.say([{
+                    text: "Could not find 'Bug Reports' channel. Unable to submit report to an admin. Is the bot set up correctly?",
+                },
+                    {
+                        type: 'command',
+                        text: "/leave",
+                    }
+                ])
+            }
         } else if (message.text === "CancelReport") {
             await conversation.set('bugreportstatus', 'Off')
             await conversation.say([{
-                participants: [message.user],
                 text: "Alright, call me again when you want to remake the report.",
-                isBackchannel: true,
             },
                 {
                     type: 'command',
@@ -117,60 +132,56 @@ bot.on('message.create.*.postback', async (message, conversation) => {
 })
 
 bot.on('message.create.*.chat.*', async (message, conversation) => {
-    log(message)
-    const status = conversation.get('bugreportstatus')
-    log(status)
-    if (status === 'Bug' && message.isBackchannel === true) {
-        bugString = message.text
-        await conversation.set('bugreportstatus', 'Replication')
-        status === 'Replication'
-        await conversation.set('bugString', message.text)
-        await conversation.say({
-            contentType: 'text/html',
-            participants: [message.user],
-            text: "Can you give a quick description on how to reconstruct the issue? This is a pretty important step so describe it in detail.",
-            isBackchannel: true,
-        })
-    } else if (status === 'Replication' && message.isBackchannel === true) {
-        await conversation.set('replicationString', message.text)
-        await conversation.set('bugreportstatus', 'Image')
-        await conversation.say({
-            contentType: 'text/html',
-            participants: [message.user],
-            text: "And do you happen to have an image of the bug? If you have one, upload it in the main channel. If you don't have one, just say anything else and I'll skip ahead.",
-            isBackchannel: true,
-        })
-    } else if (status === 'Image') {
-        let imageURL = message.text
-        const match = imageURL.match('http')
-        if (match === null) {
-            imageURL = "N/A"
-        }
-        await conversation.set('imageString', imageURL)
-        await conversation.set('bugreportstatus', 'Off')
-        const buggyString = conversation.get('bugString')
-        const replicativeString = conversation.get('replicationString')
-        const imageUrlString = conversation.get('imageString')
-        await conversation.say(
-            {
+    try {
+        const status = conversation.get('bugreportstatus')
+        if (status === 'Bug') {
+            bugString = message.text
+            await conversation.set('bugreportstatus', 'Replication')
+            status === 'Replication'
+            await conversation.set('bugString', message.text)
+            await conversation.say({
                 contentType: 'text/html',
-                participants: [message.user],
-                text: `Is this the bug report you want to submit? <i></br></br><b>Issue description</b>:</br>${buggyString}</br></br><b>Steps to replicate:</b></br>${replicativeString}</br></br><b>Image of the issue</b>:</br>${imageUrlString}</i>`,
-                isBackchannel: true,
-                actions: [
-                    {
-                        type: "reply",
-                        text: "Yes, send it off.",
-                        payload: "ContinueReport"
-                    },
-                    {
-                        type: "reply",
-                        text: "No, cancel the report.",
-                        payload: "CancelReport"
-                    }
-                ]
+                text: "Can you give a quick description on how to reconstruct the issue? This is a pretty important step so describe it in detail.",
+            })
+        } else if (status === 'Replication' === true) {
+            await conversation.set('replicationString', message.text)
+            await conversation.set('bugreportstatus', 'Image')
+            await conversation.say({
+                contentType: 'text/html',
+                text: "And do you happen to have an image of the bug? If you have one, upload it in the main channel. If you don't have one, just say anything else and I'll skip ahead.",
+            })
+        } else if (status === 'Image') {
+            let imageURL = message.text
+            const match = imageURL.match('http')
+            if (match === null) {
+                imageURL = "N/A"
             }
-        )
+            await conversation.set('imageString', imageURL)
+            await conversation.set('bugreportstatus', 'Off')
+            const buggyString = conversation.get('bugString')
+            const replicativeString = conversation.get('replicationString')
+            const imageUrlString = conversation.get('imageString')
+            await conversation.say(
+                {
+                    contentType: 'text/html',
+                    text: `Is this the bug report you want to submit? <i></br></br><b>Issue description</b>:</br>${buggyString}</br></br><b>Steps to replicate:</b></br>${replicativeString}</br></br><b>Image of the issue</b>:</br>${imageUrlString}</i>`,
+                    actions: [
+                        {
+                            type: "reply",
+                            text: "Yes, send it off.",
+                            payload: "ContinueReport"
+                        },
+                        {
+                            type: "reply",
+                            text: "No, cancel the report.",
+                            payload: "CancelReport"
+                        }
+                    ]
+                }
+            )
+        }
+    } catch(e) {
+        errorCatch(e)
     }
 })
 
