@@ -40,91 +40,75 @@ if (!process.env.TOKEN) {
 bot.on('error', log);
 
 bot.on('message.create.*.command', async (message, conversation) => {
-    if (message.text === "/assign" && message.meta.users[0] === '5f42534edf6aa7001d0e7f1b') {
-        try {
-            await conversation.say({
-                contentType: 'text/html',
-                text: "Hey there! Support Chip here! You have called me to report a bug, isn't that right?",
-                actions: [
-                    {
-                        type: "reply",
-                        text: "Yes, that's right.",
-                        payload: "Continue"
-                    },
-                    {
-                        type: "reply",
-                        text: "No, I didn't.",
-                        payload: "Cancel"
-                    }
-                ]
-            })
-        } catch (e) {
-            errorCatch(e)
+    if (message.text === "/assign" && message.meta.users[0] === '5f5cb6fa06c7d0001dd64e0b') {
+        if (conversation.type === "agent" && message.text === "/join" || conversation.type === "agent" && message.text === "/assign") {
+            try {
+                const user = conversation.participants.find(p => p.role === 'agent');
+                if (user) {
+                    bot.send(conversation.id, [
+                        {
+                            text: `Hello ${user.displayName}! Do you want to be upgraded to the Agent role?`,
+                            role: 'bot',
+                            delay: incrementor.set(3),
+                            actions: [
+                            {
+                                type: "reply",
+                                text: "Yes!",
+                                payload: "AskForUpgrade"
+                            },
+                            {
+                                type: "reply",
+                                text: "No.",
+                                payload: "Cancel"
+                            }
+                            ]
+                        }
+                    ]);
+                }
+            } catch (e) {
+                errorCatch(e)
+            };
         }
+
     }
 });
 
 bot.on('message.create.*.postback', async (message, conversation) => {
     try {
-        if (message.text === "Continue") {
-            await conversation.say({
-                text: "Alright! So can you describe the issue you're having?",
-            })
-            await conversation.set('bugreportstatus', 'Bug')
-        } else if (message.text === "Cancel") {
-            await conversation.set('bugreportstatus', 'Off')
-            await conversation.say([{
-                text: "Ok then! Have a good day!",
-            },
-                {
-                    type: 'command',
-                    text: "/leave"
-                }
-            ])
-        } else if (message.text === "ContinueReport") {
-            const botty = await bot.users.get('5f42534edf6aa7001d0e7f1b')
-            const channelname = botty.meta.bugreportchannel
-            const channel = await bot.channels.list({name: "Bug Reports", limit:1})
-            log(channel[0])
-            if (channel[0].id) {
-                await conversation.set('bugreportstatus', 'Off')
-                await conversation.say([{
-                    text: "Report submitted! Thanks for your help!",
-                },
-                    {
-                        type: 'command',
-                        text: "/leave"
-                    },
-                    {
-                        type: 'command',
-                        text: "/notify",
-                        meta: {
-                            channels: [
-                                channel[0].id
-                            ]
+        if (message.text === "AskForUpgrade") {
+            const user = conversation.participants.find(p => p.role === 'agent');
+            const getUser = await bot.users.get(user.user)
+            const organization = await bot.organizations.get(user.organization)
+            const adminColleagues = await bot.users.list({ organization:user.organization, role:'admin' || 'owner' , limit:10 })
+            const adminArray = []
+            for await (const element of adminColleagues) {
+                try {
+                    if (element.status === "active") {
+                        const arrayElement = {
+                            type: "reply",
+                            text: element.displayName,
+                            payload: "adminToAsk"
                         }
+                        adminArray.push(arrayElement)
                     }
-                ])
-            } else {
-                await conversation.say([{
-                    text: "Could not find 'Bug Reports' channel. Unable to submit report to an admin. Is the bot set up correctly?",
-                },
-                    {
-                        type: 'command',
-                        text: "/leave",
-                    }
-                ])
-            }
-        } else if (message.text === "CancelReport") {
-            await conversation.set('bugreportstatus', 'Off')
-            await conversation.say([{
-                text: "Alright, call me again when you want to remake the report.",
-            },
-                {
-                    type: 'command',
-                    text: "/leave"
+                } catch (e) {
+                    errorCatch(e)
                 }
-            ])
+            }
+            log(adminArray)
+            await conversation.say({
+                text: "Alright! I'll have to ask an admin for permission before I can upgrade you. Which admin do you want me to ask?",
+                role: 'bot',
+                delay: incrementor.set(3),
+                actions: adminArray
+            })
+        } else if (message.text === "adminToAsk") {
+            await conversation.say({
+                text: "Alright! I'll ask him for permission. In the mean time, you'll just have to wait.",
+                role: 'bot',
+                delay: incrementor.set(3),
+            })
+            log(message)
         }
     } catch (e) {
         errorCatch(e)
