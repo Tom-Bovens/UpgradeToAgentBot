@@ -39,18 +39,17 @@ if (!process.env.TOKEN) {
 // Logs any error produced to the console
 bot.on('error', log);
 
-bot.on('message.create.*.command', async (message, conversation) => {
-    if (message.text === "/assign" && message.meta.users[0] === '5f5cb6fa06c7d0001dd64e0b') {
-        if (conversation.type === "agent" && message.text === "/join" || conversation.type === "agent" && message.text === "/assign") {
-            try {
-                const user = conversation.participants.find(p => p.role === 'agent');
-                if (user) {
-                    bot.send(conversation.id, [
-                        {
-                            text: `Hello ${user.displayName}! Do you want to be upgraded to the Agent role?`,
-                            role: 'bot',
-                            delay: incrementor.set(3),
-                            actions: [
+bot.on('assign', async (message, conversation) => {
+    if (conversation.type === "agent") {
+        try {
+            const user = conversation.participants.find(p => p.role === 'agent');
+            if (user) {
+                bot.send(conversation.id, [
+                    {
+                        text: `Hello! Do you want to be upgraded to the Agent role?`,
+                        role: 'bot',
+                        delay: incrementor.set(3),
+                        actions: [
                             {
                                 type: "reply",
                                 text: "Yes!",
@@ -61,15 +60,13 @@ bot.on('message.create.*.command', async (message, conversation) => {
                                 text: "No.",
                                 payload: "Cancel"
                             }
-                            ]
-                        }
-                    ]);
-                }
-            } catch (e) {
-                errorCatch(e)
-            };
-        }
-
+                        ]
+                    }
+                ]);
+            }
+        } catch (e) {
+            errorCatch(e)
+        };
     }
 });
 
@@ -81,13 +78,13 @@ bot.on('message.create.*.postback', async (message, conversation) => {
             const organization = await bot.organizations.get(user.organization)
             const adminColleagues = await bot.users.list({ organization:user.organization, role:'admin' || 'owner' , limit:10 })
             const adminArray = []
-            for await (const element of adminColleagues) {
+            for await (const adminUser of adminColleagues) {
                 try {
-                    if (element.status === "active") {
+                    if (adminUser.status === "active") {
                         const arrayElement = {
                             type: "reply",
-                            text: element.displayName,
-                            payload: "adminToAsk"
+                            text: adminUser.displayName,
+                            payload: `adminToAsk:${adminUser.id}`
                         }
                         adminArray.push(arrayElement)
                     }
@@ -95,20 +92,35 @@ bot.on('message.create.*.postback', async (message, conversation) => {
                     errorCatch(e)
                 }
             }
-            log(adminArray)
             await conversation.say({
                 text: "Alright! I'll have to ask an admin for permission before I can upgrade you. Which admin do you want me to ask?",
                 role: 'bot',
                 delay: incrementor.set(3),
                 actions: adminArray
             })
-        } else if (message.text === "adminToAsk") {
+        } else if (message.text.match("adminToAsk")) {
+            const user = conversation.participants.find(p => p.role === 'agent');
+            const getUser = await bot.users.get(user.user)
+            const id = message.text.slice(11)
+            const adminUser = await bot.users.get(id)
             await conversation.say({
-                text: "Alright! I'll ask him for permission. In the mean time, you'll just have to wait.",
+                text: `Alright! I'll ask ${adminUser.givenName} for permission. In the mean time, you'll just have to wait.`,
                 role: 'bot',
                 delay: incrementor.set(3),
             })
-            log(message)
+            const adminconversation = await bot.conversations.create(
+            { name: 'Upgrade guest to Agent', messages: [{ text: `Hey there ${adminUser.givenName}! I've come to forward a request from the Guest account ${getUser.displayName} to have their account upgraded to Agent status.` }, { delay: incrementor.set(5) }] }
+            )
+            log(adminconversation)
+            await bot.send(adminconversation.id, {
+                type: 'command',
+                text: '/assign',
+                meta: {
+                    "users": [
+                        adminUser.id
+                    ]
+                }
+            })
         }
     } catch (e) {
         errorCatch(e)
