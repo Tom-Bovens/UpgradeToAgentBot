@@ -97,7 +97,6 @@ bot.on('message.create.*.postback', async (message, conversation) => {
             });
         } else if (message.text.match('adminToAsk')) {
             const user = conversation.participants.find((p) => p.role === 'agent');
-            const getUser = await bot.users.get(user.user);
             const id = message.text.slice(11);
             const adminUser = await bot.users.get(id);
             await conversation.say({
@@ -106,10 +105,26 @@ bot.on('message.create.*.postback', async (message, conversation) => {
                 delay: incrementor.set(3)
             });
             const adminconversation = await bot.conversations.create(
-                { name: 'Upgrade guest to Agent', messages: [{ text: `Hey there ${adminUser.givenName}! I've come to forward a request from the Guest account ${getUser.displayName} to have their account upgraded to Agent status.` }, { delay: incrementor.set(5) }] }
+                { name: 'Upgrade guest to Agent', messages: [{ text: `Hey ${adminUser.givenName}!` }] }
             );
-            log(adminconversation);
-            await bot.send(adminconversation.id, {
+            conversation.set('adminConvUrl', adminconversation.id);
+            await bot.send(adminconversation.id, [{
+                text: `I've come to forward a request from the Guest account ${user.name} to have their account upgraded to Agent stats.`,
+                delay: incrementor.set(4),
+                actions: [
+                    {
+                        type: 'reply',
+                        text: 'Accept upgrade.',
+                        payload: 'AcceptUpgrade'
+                    },
+                    {
+                        type: 'reply',
+                        text: 'Deny upgrade.',
+                        payload: 'CancelUpgrade'
+                    }
+                ]
+            },
+            {
                 type: 'command',
                 text: '/assign',
                 meta: {
@@ -117,7 +132,33 @@ bot.on('message.create.*.postback', async (message, conversation) => {
                         adminUser.id
                     ]
                 }
-            });
+            }]);
+        } else if (message.text.match('accepted-')) {
+            await bot.send(adminconversation.id, [{
+                text: `I've come to forward a request from the Guest account ${user.name} to have their account upgraded to Agent stats.`,
+                delay: incrementor.set(4),
+                actions: [
+                    {
+                        type: 'reply',
+                        text: 'Accept upgrade.',
+                        payload: 'AcceptUpgrade'
+                    },
+                    {
+                        type: 'reply',
+                        text: 'Deny upgrade.',
+                        payload: 'CancelUpgrade'
+                    }
+                ]
+            },
+            {
+                type: 'command',
+                text: '/assign',
+                meta: {
+                    users: [
+                        adminUser.id
+                    ]
+                }
+            }]);
         }
     } catch (e) {
         errorCatch(e);
