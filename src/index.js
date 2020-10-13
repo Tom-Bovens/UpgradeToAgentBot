@@ -40,7 +40,12 @@ bot.on('error', log);
 
 bot.on('assign', async (message, conversation) => {
     if (conversation.type === 'agent') {
-        const user = conversation.participants.find((p) => p.role === 'agent').catch((err) => { errorCatch(err, console.trace()); });
+        let user;
+        try {
+            user = await conversation.participants.find((p) => p.role === 'agent');
+        } catch (e) {
+            errorCatch(e);
+        }
         if (user) {
             bot.send(conversation.id, [
                 {
@@ -67,8 +72,14 @@ bot.on('assign', async (message, conversation) => {
 
 bot.on('message.create.*.postback', async (message, conversation) => {
     if (message.text === 'AskForUpgrade') {
-        const user = conversation.participants.find((p) => p.role === 'agent').catch((err) => { errorCatch(err, console.trace()); });
-        const adminColleagues = await bot.users.list({ organization: user.organization, role: 'admin' || 'owner', limit: 10 }).catch((err) => { errorCatch(err, console.trace()); });
+        let user;
+        let adminColleagues;
+        try {
+            user = await conversation.participants.find((p) => p.role === 'agent');
+            adminColleagues = await bot.users.list({ organization: user.organization, role: 'admin' || 'owner', limit: 10 });
+        } catch (e) {
+            errorCatch(e, console.trace());
+        }
         const adminArray = [];
         for await (const adminUser of adminColleagues) {
             try {
@@ -91,7 +102,12 @@ bot.on('message.create.*.postback', async (message, conversation) => {
             actions: adminArray
         }).catch((err) => { errorCatch(err, console.trace()); });
     } else if (message.text.match('adminToAsk')) {
-        const user = conversation.participants.find((p) => p.role === 'agent').catch((err) => { errorCatch(err, console.trace()); });
+        let user;
+        try {
+            user = conversation.participants.find((p) => p.role === 'agent');
+        } catch (e) {
+            errorCatch(e);
+        }
         const id = message.text.slice(11);
         const adminUser = await bot.users.get(id).catch((e) => { errorCatch(e, console.trace()); });
         await conversation.say({
@@ -149,24 +165,28 @@ bot.on('message.create.*.postback', async (message, conversation) => {
 });
 
 bot.on('message.create.*.chat.*', async (message, conversation) => {
-    const ID = await conversation.get('guestConvId').catch((err) => { errorCatch(err, console.trace()); });
+    let ID;
+    try {
+        ID = await conversation.get('guestConvId');
+    } catch (e) {
+        errorCatch(e, console.trace());
+    }
     if (ID) {
         const reasonToGive = message.text;
         await bot.send(ID, [{
-            text: 'Hey. Person has declined your upgrade to the Agent role.',
-            delay: incrementor.set(3)
+            text: 'Hey. Person has declined your upgrade to the Agent role.'
         },
         {
             text: "Here's the reason he gave for declining:",
-            delay: incrementor.delay(3)
+            delay: 1000
         },
         {
             text: reasonToGive,
-            delay: incrementor.delay(5)
+            delay: 3000
         },
         {
             text: 'Take it up with Person if you have any gripes, maybe you can convince him. Have a nice day!',
-            delay: incrementor.delay(3)
+            delay: 5000
         }
         ]).catch((err) => { errorCatch(err, console.trace()); });
     }
