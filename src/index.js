@@ -120,7 +120,7 @@ bot.on('message.create.*.postback', async (message, conversation) => {
         ).catch((err) => { errorCatch(err, console.trace()); });
         conversation.set('adminConvUrl', adminconversation.id).catch((err) => { errorCatch(err, console.trace()); });
         conversation.set('adminName', adminUser.givenName).catch((err) => { errorCatch(err, console.trace()); });
-        bot.conversations.update(adminconversation.id, { meta: { guestId: user.id } })
+        bot.conversations.update(adminconversation.id, { meta: { guestId: user.user } })
             .catch((err) => { errorCatch(err, console.trace()); });
         await bot.send(adminconversation.id, [{
             text: `I've come to forward a request from the Guest account ${user.name} to have their account upgraded to Agent stats.`,
@@ -129,7 +129,7 @@ bot.on('message.create.*.postback', async (message, conversation) => {
                 {
                     type: 'reply',
                     text: 'Accept upgrade.',
-                    payload: `accepted-${user.id}`
+                    payload: `accepted-${user.user}`
                 },
                 {
                     type: 'reply',
@@ -164,7 +164,7 @@ bot.on('message.create.*.postback', async (message, conversation) => {
         const adminconversation = await bot.conversations.create(
             { name: 'Your request was accepted.', messages: [{ text: 'Hey there!' }] }
         ).catch((err) => { errorCatch(err, console.trace()); });
-        const user = bot.users.get(userid).catch((err) => { errorCatch(err, console.trace()); });
+        const user = await bot.users.get(userid).catch((e) => { errorCatch(e, console.trace()); });
         await bot.send(adminconversation.id, [{
             text: 'Your requested account upgrade to Agent was approved! You now have access to all the magical features that ChatShipper has to offer!',
             delay: incrementor.set(3)
@@ -201,9 +201,8 @@ bot.on('message.create.*.chat.*', async (message, conversation) => {
             text: "Alright, i'll go inform him now."
         }
         ]).catch((err) => { errorCatch(err, console.trace()); });
-        const adminName = await conversation.get('adminName');
         await bot.send(ID, [{
-            text: `Hey. ${adminName} has declined your upgrade to the Agent role.`
+            text: 'Hey, your request for an upgrade to the Agent role was declined.'
         },
         {
             text: "Here's the reason he gave for declining:",
@@ -214,7 +213,7 @@ bot.on('message.create.*.chat.*', async (message, conversation) => {
             delay: 3000
         },
         {
-            text: `Take it up with ${adminName} if you have any gripes, maybe you can convince him. Have a nice day!`,
+            text: 'Take it up with the admin you asked me to contact if you have any gripes, maybe you can convince him. Have a nice day!',
             delay: 5000
         }
         ]).catch((err) => { errorCatch(err, console.trace()); });
